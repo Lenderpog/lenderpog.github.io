@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Resultados Encuesta - Determination Brews</title>
+  <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    body {
+      margin: 0;
+      padding: 20px;
+      font-family: "Press Start 2P", monospace;
+      color: white;
+      background: url("images/fondo.jpg") no-repeat center center fixed;
+      background-size: cover;
+      text-align: center;
+    }
+    h2 {
+      text-shadow: 2px 2px 0 #000;
+      margin-top: 40px;
+      margin-bottom: 10px;
+    }
+    canvas {
+      background: rgba(0,0,0,0.6);
+      border: 3px solid white;
+      border-radius: 12px;
+      margin-bottom: 40px;
+      max-width: 600px;
+    }
+    #informacionContainer {
+      max-width: 1000px;
+      margin: 30px auto;
+      overflow-x: auto;
+      background: rgba(0,0,0,0.7);
+      border: 3px solid white;
+      border-radius: 12px;
+      padding: 10px;
+    }
+    #informacion {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12px;
+      color: white;
+      text-align: center;
+    }
+    #informacion th, #informacion td {
+      border: 1px solid white;
+      padding: 6px;
+      position: relative;
+    }
+    #informacion th {
+      background: rgba(255,255,255,0.2);
+      font-weight: bold;
+    }
+    .barra {
+      height: 12px;
+      background: #00ffcc;
+      display: inline-block;
+      border-radius: 4px;
+      margin-top: 2px;
+    }
+    .barra-max {
+      background: #ff0000;
+    }
+    .porcentaje {
+      font-weight: bold;
+      color: #ffcc00;
+    }
+  </style>
+</head>
+<body>
+  <h1>Resultados de la Encuesta</h1>
+
+  <h2>1. Endulzante preferido</h2>
+  <canvas id="graficoEndulzante"></canvas>
+
+  <h2>2. Otro endulzante</h2>
+  <canvas id="graficoOtroEndulzante"></canvas>
+
+  <h2>3. Frutas favoritas</h2>
+  <canvas id="graficoFrutas"></canvas>
+
+  <h2>4. Precio a pagar</h2>
+  <canvas id="graficoPrecio"></canvas>
+
+  <h2>5. Cosplay llamativo</h2>
+  <canvas id="graficoCosplay"></canvas>
+
+  <h2>Información</h2>
+  <div id="informacionContainer">
+    <table id="informacion"></table>
+  </div>
+
+  <!-- Firebase -->
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
+
+  <script>
+    // Configuración Firebase
+    const firebaseConfig = {
+      apiKey: "AIzaSyD1djuXf4a5y9uucZEHBrL_HWgWr0PqH3M",
+      authDomain: "encuestaundertale.firebaseapp.com",
+      projectId: "encuestaundertale",
+      storageBucket: "encuestaundertale.firebasestorage.app",
+      messagingSenderId: "34519487798",
+      appId: "1:34519487798:web:7d53e84d8551693cf84f97",
+      measurementId: "G-QMTMF22EHY"
+    };
+
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.firestore();
+
+    const preguntas = ['endulzante','otroEndulzante','frutas','precio','cosplay'];
+    const charts = {};
+
+    function renderEncuesta(encuestas) {
+      if (!encuestas.length) return;
+
+      const conteos = {};
+      preguntas.forEach(p => conteos[p] = {});
+
+      encuestas.forEach(e => {
+        preguntas.forEach(p => {
+          const valor = e[p];
+          if (valor) {
+            let valores = Array.isArray(valor) ? valor : valor.toString().split(',').map(v => v.trim());
+            valores.forEach(v => {
+              if (v) conteos[p][v] = (conteos[p][v] || 0) + 1;
+            });
+          }
+        });
+      });
+
+      preguntas.forEach(p => {
+        const canvasId = 'grafico' + p.charAt(0).toUpperCase() + p.slice(1);
+        const ctx = document.getElementById(canvasId).getContext('2d');
+        const labels = Object.keys(conteos[p]);
+        if (labels.length === 0) return;
+        const max = Math.max(...Object.values(conteos[p]));
+        const dataValores = Object.values(conteos[p]).map(v => (v / max * 100).toFixed(1));
+        const colors = Object.values(conteos[p]).map(v => v === max ? '#ff0000' : '#00ffcc');
+
+        if (charts[p]) {
+          charts[p].data.labels = labels;
+          charts[p].data.datasets[0].data = dataValores;
+          charts[p].data.datasets[0].backgroundColor = colors;
+          charts[p].update();
+        } else {
+          charts[p] = new Chart(ctx, {
+            type: 'bar',
+            data: {
+              labels: labels,
+              datasets: [{
+                label: 'Porcentaje sobre el más votado',
+                data: dataValores,
+                backgroundColor: colors,
+                borderColor: '#fff',
+                borderWidth: 2
+              }]
+            },
+            options: {
+              plugins: { legend:{ display:false } },
+              scales: {
+                y: { beginAtZero:true, max:100, ticks:{ callback: v=>v+'%', color:'#fff' } },
+                x: { ticks:{ color:'#fff' } }
+              }
+            }
+          });
+        }
+      });
+
+      const tabla = document.getElementById('informacion');
+      tabla.innerHTML = `
+        <tr>
+          <th>#</th>
+          <th>Endulzante</th>
+          <th>Otro Endulzante</th>
+          <th>Frutas</th>
+          <th>Precio</th>
+          <th>Cosplay</th>
+        </tr>
+      `;
+
+      const totalEncuestas = encuestas.length;
+
+      encuestas.forEach((e, i) => {
+        tabla.innerHTML += `
+          <tr>
+            <td>${i+1}</td>
+            <td>${crearBarra(e.endulzante, conteos.endulzante, totalEncuestas)}</td>
+            <td>${crearBarra(e.otroEndulzante, conteos.otroEndulzante, totalEncuestas)}</td>
+            <td>${crearBarra(e.frutas, conteos.frutas, totalEncuestas, true)}</td>
+            <td>${crearBarra(e.precio, conteos.precio, totalEncuestas)}</td>
+            <td>${crearBarra(e.cosplay, conteos.cosplay, totalEncuestas)}</td>
+          </tr>
+        `;
+      });
+
+      function crearBarra(valor, conteoPregunta, total, multiple=false){
+        if(!valor) return '';
+        let valores = multiple ? (Array.isArray(valor) ? valor : valor.toString().split(',').map(v => v.trim())) : [valor];
+        return valores.map(v => {
+          let c = conteoPregunta[v] || 0;
+          let porcentaje = total ? ((c / total) * 100).toFixed(1) : 0;
+          let max = Math.max(...Object.values(conteoPregunta));
+          let clase = c === max ? 'barra barra-max' : 'barra';
+          return `<div>${v} <span class="porcentaje">${porcentaje}%</span>
+                    <div class="${clase}" style="width:${porcentaje}%;"></div>
+                  </div>`;
+        }).join('');
+      }
+    }
+
+    // 🔹 Escuchar cambios en tiempo real
+    db.collection('respuestas').onSnapshot(snapshot => {
+      const encuestas = snapshot.docs.map(doc => doc.data());
+      renderEncuesta(encuestas);
+    });
+
+  </script>
+</body>
+</html>
